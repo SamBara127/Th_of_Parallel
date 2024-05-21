@@ -3,7 +3,7 @@
 #include <cmath>
 #include <omp.h>
 
-#define N 256 // Размер пластинки (NxN)
+#define N 120 // Размер пластинки (NxN)
 #define EPSILON 0.00001 // Точность
 
 // #ifdef FIRST
@@ -60,17 +60,20 @@ int main(int argc, char* argv[])
     double* grid_swap = init_grid(N, N);
     double error = 1.0;
 
-    
+    #ifdef FIRST
     while (error > EPSILON)
     {
-        #ifdef FIRST
         error = sequence_temp(grid, grid_swap,N,N);
-        #endif
-        #ifdef SECOND
-        error = 0.0;
-        #pragma omp parallel
+        // std::cout << "ERROR -> " << error << std::endl;
+        std::swap(grid, grid_swap);
+    }
+    #else 
+    #ifdef SECOND
+    #pragma omp parallel
+    {
+        while (error > EPSILON)
         {
-            #pragma omp for schedule(static, N/50) 
+            error = 0.0;
             for (int i = 1; i < N - 1; i++) 
             {
                 for (int j = 1; j < N - 1; j++) 
@@ -78,8 +81,6 @@ int main(int argc, char* argv[])
                     grid[j+N*i] = (grid_swap[(j-1)+N*i]+grid_swap[(j+1)+N*i]+grid_swap[j+N*(i-1)]+grid_swap[j+N*(i+1)]) / 4.0;
                 }
             }
-            
-            #pragma omp for reduction(max:error)
             for (int i = 1; i < N - 1; i++) 
             {
                 for (int j = 1; j < N - 1; j++) 
@@ -87,13 +88,17 @@ int main(int argc, char* argv[])
                     error = fabs(grid_swap[j+N*i]-grid[j+N*i]) > error ? fabs(grid_swap[j+N*i]-grid[j+N*i]) : error;
                 }
             }
+            # Гонка данных присутствует!!!, но по условию задачи исправлению она необязательно должна подлежать
+            # так как нам надо увидеть разницу в двух исполнениях кода
+            // std::cout << "ERROR -> " << error << std::endl;
+            std::swap(grid, grid_swap);
         }
-        #endif
-
-        // std::cout << "ERROR -> " << error << std::endl;
-        std::swap(grid, grid_swap);
     }
-   
+    #else
+    std::cout << "Не выбран нужный вариант компилляции!!!\n";
+    #endif
+    #endif
+    
 
     double end_time = omp_get_wtime();
     double time = end_time - start_time;
