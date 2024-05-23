@@ -73,7 +73,10 @@ int main(int argc, char* argv[])
     {
         while (error > EPSILON)
         {
-            error = 0.0;
+            error = 0;
+            double loc_error = 0.0;
+
+            // #pragma omp for
             for (int i = 1; i < N - 1; i++) 
             {
                 for (int j = 1; j < N - 1; j++) 
@@ -81,16 +84,23 @@ int main(int argc, char* argv[])
                     grid[j+N*i] = (grid_swap[(j-1)+N*i]+grid_swap[(j+1)+N*i]+grid_swap[j+N*(i-1)]+grid_swap[j+N*(i+1)]) / 4.0;
                 }
             }
+
+            // #pragma omp for
             for (int i = 1; i < N - 1; i++) 
             {
                 for (int j = 1; j < N - 1; j++) 
                 {
-                    error = fabs(grid_swap[j+N*i]-grid[j+N*i]) > error ? fabs(grid_swap[j+N*i]-grid[j+N*i]) : error;
+                    loc_error = fabs(grid_swap[j+N*i]-grid[j+N*i]) > loc_error ? fabs(grid_swap[j+N*i]-grid[j+N*i]) : loc_error;
                 }
             }
-            # Гонка данных присутствует!!!, но по условию задачи исправлению она необязательно должна подлежать
-            # так как нам надо увидеть разницу в двух исполнениях кода
-            // std::cout << "ERROR -> " << error << std::endl;
+            #pragma omp critical
+            {
+                if (loc_error > error) 
+                {
+                    error = loc_error;
+                }
+            }
+            std::cout << "ERROR -> " << error << std::endl;
             std::swap(grid, grid_swap);
         }
     }
