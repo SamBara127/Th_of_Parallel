@@ -1,6 +1,6 @@
 EXE = app.out
 FL = 
-THREADS = 40
+THREADS = 16
 
 ifdef FIRST
     FLAGS += -DFIRST

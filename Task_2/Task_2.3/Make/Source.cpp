@@ -110,7 +110,7 @@ int main(int argc, char* argv[])
                 // if (loc_error > error) 
                 // {
                     error = loc_error;
-                    std::cout << "ERROR -> " << error << std::endl;
+                    // std::cout << "ERROR -> " << error << std::endl;
                 // }
             // }
             // std::cout << "ERROR -> " << error << std::endl;
