@@ -1,17 +1,13 @@
 #include <iostream>
-#include <cstdlib>
-#include <cmath>
+#include <cstdlib> // для работы с функциями стандартной библиотеки C, такими как atoi.
+#include <cmath> // для математических операций, таких как fabs - абсолютное значние числа вещественного или модуль
 #include <omp.h>
 
 #define N 120 // Размер пластинки (NxN)
-#define EPSILON 0.00001 // Точность
+#define EPSILON 0.00001 // Точность для завершения итераций (порог ошибки)
 
-// #ifdef FIRST
-    
-// #else
-    
-// #endif
-
+// Эта функция инициализирует сетку 
+// (двумерный массив, представленный в виде одномерного) с размером N x N. 
 double* init_grid(int size_x, int size_y)
 {
     double* grid = new double[size_x*size_y];
@@ -26,10 +22,17 @@ double* init_grid(int size_x, int size_y)
     return grid;
 }
 
+//  функция проводит одну итерацию вычислений для обновления температуры на сетке и
+//  вычисления максимальной ошибки
 double sequence_temp(double* grid, double* grid_swap, int size_x, int size_y)
 {
     double error = 0.0;
     
+    // что такое редукция в данном контексте -  это набор манипуляций с переменной в параллельной логике работы, а именно:
+    // Для каждого потока OpenMP создаёт свою локальную копию переменной error. Эти копии будут использоваться независимо в каждом потоке.
+    // В каждом потоке error будет обновляться независимо, согласно вычислениям, которые происходят внутри цикла.
+    // После завершения всех итераций параллельного цикла, OpenMP автоматически объединит все локальные копии переменной error, 
+    // выбрав максимальное значение из них и сохранив его в глобальную переменную error, доступную в основном потоке.
     #pragma omp parallel for reduction(max:error)  // без reduction будет гонка данных за error
     //(можно использовать локальную переменную и critical, но зачем)) 
     // MAX:error - операция которую проводим между вычисленными локальными максимумами в потоках
@@ -42,6 +45,8 @@ double sequence_temp(double* grid, double* grid_swap, int size_x, int size_y)
         }
     }
     return error;
+    // Использование директивы reduction в OpenMP снижает количество блокировок за счёт локального вычисления 
+    // и откладывает синхронизацию до конца параллельного блока
 }
 
 int main(int argc, char* argv[]) 
@@ -53,8 +58,9 @@ int main(int argc, char* argv[])
 
     std::cout << "Максимальное колличество потоков: " << omp_get_max_threads() << std::endl << std::endl;
 
+    // Устанавливается количество потоков для OpenMP
     omp_set_num_threads(threads);
-    double start_time = omp_get_wtime();
+    double start_time = omp_get_wtime(); // захват начального времени работы программы
 
     double* grid = init_grid(N, N);
     double* grid_swap = init_grid(N, N);
@@ -69,14 +75,20 @@ int main(int argc, char* argv[])
     }
     #else 
     #ifdef SECOND
+    // В данном блоке кода компиллятор использует многопоточность только для вычислений блоков с циклом for
+    // собственно, они там и помечены через #pragma omp collapse(2) nowait (чисто для наглядности, потому что компиллятор сам это применяет)
+    // поэтому остальное выполняется последовательно, а значит и не надо использовать никакую синхронизацию кода и гонок данных нет
     #pragma omp parallel
     {
         while (error > EPSILON)
         {
-            error = 0;
+            // #pragma omp critical
+            // {
+                error = 0;
+            // }
             double loc_error = 0.0;
 
-            // #pragma omp for
+            #pragma omp collapse(2) nowait
             for (int i = 1; i < N - 1; i++) 
             {
                 for (int j = 1; j < N - 1; j++) 
@@ -85,7 +97,7 @@ int main(int argc, char* argv[])
                 }
             }
 
-            // #pragma omp for
+            #pragma omp collapse(2) nowait // добавлено чисто для визуализации как работает (то есть можно и без нее)
             for (int i = 1; i < N - 1; i++) 
             {
                 for (int j = 1; j < N - 1; j++) 
@@ -93,14 +105,15 @@ int main(int argc, char* argv[])
                     loc_error = fabs(grid_swap[j+N*i]-grid[j+N*i]) > loc_error ? fabs(grid_swap[j+N*i]-grid[j+N*i]) : loc_error;
                 }
             }
-            #pragma omp critical
-            {
-                if (loc_error > error) 
-                {
+            // #pragma omp critical
+            // {
+                // if (loc_error > error) 
+                // {
                     error = loc_error;
-                }
-            }
-            std::cout << "ERROR -> " << error << std::endl;
+                    std::cout << "ERROR -> " << error << std::endl;
+                // }
+            // }
+            // std::cout << "ERROR -> " << error << std::endl;
             std::swap(grid, grid_swap);
         }
     }
